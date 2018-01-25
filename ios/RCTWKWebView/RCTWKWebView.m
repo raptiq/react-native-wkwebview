@@ -16,8 +16,8 @@
 
 // runtime trick to remove WKWebView keyboard default toolbar
 // see: http://stackoverflow.com/questions/19033292/ios-7-uiwebview-keyboard-issue/19042279#19042279
-@interface _SwizzleHelperWK : NSObject @end
-@implementation _SwizzleHelperWK
+@interface _SwizzleHelper : NSObject @end
+@implementation _SwizzleHelper
 -(id)inputAccessoryView
 {
   return nil;
@@ -33,7 +33,6 @@
 @property (nonatomic, copy) RCTDirectEventBlock onShouldStartLoadWithRequest;
 @property (nonatomic, copy) RCTDirectEventBlock onProgress;
 @property (nonatomic, copy) RCTDirectEventBlock onMessage;
-@property (nonatomic, copy) RCTDirectEventBlock onScroll;
 @property (assign) BOOL sendCookies;
 
 @end
@@ -56,20 +55,19 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
   if(self = [self initWithFrame:CGRectZero])
   {
     super.backgroundColor = [UIColor clearColor];
-
+    
     _automaticallyAdjustContentInsets = YES;
     _contentInset = UIEdgeInsetsZero;
-
+    
     WKWebViewConfiguration* config = [[WKWebViewConfiguration alloc] init];
     config.processPool = processPool;
     WKUserContentController* userController = [[WKUserContentController alloc]init];
     [userController addScriptMessageHandler:[[WeakScriptMessageDelegate alloc] initWithDelegate:self] name:@"reactNative"];
     config.userContentController = userController;
-
+    
     _webView = [[WKWebView alloc] initWithFrame:self.bounds configuration:config];
     _webView.UIDelegate = self;
     _webView.navigationDelegate = self;
-    _webView.scrollView.delegate = self;
     [_webView addObserver:self forKeyPath:@"estimatedProgress" options:NSKeyValueObservingOptionNew context:nil];
     [self addSubview:_webView];
   }
@@ -104,7 +102,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
 
   if(subview == nil) return;
 
-  NSString* name = [NSString stringWithFormat:@"%@_SwizzleHelperWK", subview.class.superclass];
+  NSString* name = [NSString stringWithFormat:@"%@_SwizzleHelper", subview.class.superclass];
   Class newClass = NSClassFromString(name);
 
   if(newClass == nil)
@@ -112,7 +110,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
     newClass = objc_allocateClassPair(subview.class, [name cStringUsingEncoding:NSASCIIStringEncoding], 0);
     if(!newClass) return;
 
-    Method method = class_getInstanceMethod([_SwizzleHelperWK class], @selector(inputAccessoryView));
+    Method method = class_getInstanceMethod([_SwizzleHelper class], @selector(inputAccessoryView));
       class_addMethod(newClass, @selector(inputAccessoryView), method_getImplementation(method), method_getTypeEncoding(method));
 
     objc_registerClassPair(newClass);
@@ -143,16 +141,6 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
 - (void)goBack
 {
   [_webView goBack];
-}
-
-- (BOOL)canGoBack
-{
-  return [_webView canGoBack];
-}
-
-- (BOOL)canGoForward
-{
-  return [_webView canGoForward];
 }
 
 - (void)reload
@@ -288,52 +276,15 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
   @catch (NSException * __unused exception) {}
 }
 
-- (void)scrollViewDidScroll:(UIScrollView *)scrollView
-{
-  NSDictionary *event = @{
-    @"contentOffset": @{
-      @"x": @(scrollView.contentOffset.x),
-      @"y": @(scrollView.contentOffset.y)
-    },
-    @"contentInset": @{
-      @"top": @(scrollView.contentInset.top),
-      @"left": @(scrollView.contentInset.left),
-      @"bottom": @(scrollView.contentInset.bottom),
-      @"right": @(scrollView.contentInset.right)
-    },
-    @"contentSize": @{
-      @"width": @(scrollView.contentSize.width),
-      @"height": @(scrollView.contentSize.height)
-    },
-    @"layoutMeasurement": @{
-      @"width": @(scrollView.frame.size.width),
-      @"height": @(scrollView.frame.size.height)
-    },
-    @"zoomScale": @(scrollView.zoomScale ?: 1),
-  };
-
-  _onScroll(event);
-}
-
 #pragma mark - WKNavigationDelegate methods
 
 - (void)webView:(__unused WKWebView *)webView decidePolicyForNavigationAction:(WKNavigationAction *)navigationAction decisionHandler:(void (^)(WKNavigationActionPolicy))decisionHandler
 {
-  UIApplication *app = [UIApplication sharedApplication];
   NSURLRequest *request = navigationAction.request;
   NSURL* url = request.URL;
   NSString* scheme = url.scheme;
   
   BOOL isJSNavigation = [scheme isEqualToString:RCTJSNavigationScheme];
-
-  // handle mailto and tel schemes
-  if ([scheme isEqualToString:@"mailto"] || [scheme isEqualToString:@"tel"]) {
-    if ([app canOpenURL:url]) {
-      [app openURL:url];
-      decisionHandler(WKNavigationActionPolicyCancel);
-      return;
-    }
-  }
   
   // skip this for the JS Navigation handler
   if (!isJSNavigation && _onShouldStartLoadWithRequest) {
@@ -368,6 +319,19 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
   else {
     decisionHandler(WKNavigationActionPolicyAllow);
   }
+}
+
+- (void)webView:(WKWebView *)webView decidePolicyForNavigationResponse:(WKNavigationResponse *)navigationResponse decisionHandler:(void (^)(WKNavigationResponsePolicy))decisionHandler
+{
+  NSArray *cookies = [NSHTTPCookie cookiesWithResponseHeaderFields:((NSHTTPURLResponse *)navigationResponse.response).allHeaderFields forURL:((NSHTTPURLResponse *)navigationResponse.response).URL];
+  
+  for (int i = 0; i < cookies.count; i++) {
+    NSHTTPCookie *cookie = [cookies objectAtIndex:i];
+    NSLog(@"cookie: name=%@, value=%@", cookie.name, cookie.value);
+    [[NSHTTPCookieStorage sharedHTTPCookieStorage] setCookie:cookie];
+  }
+  
+  decisionHandler(WKNavigationResponsePolicyAllow);
 }
 
 - (void)webView:(__unused WKWebView *)webView didFailProvisionalNavigation:(__unused WKNavigation *)navigation withError:(NSError *)error
