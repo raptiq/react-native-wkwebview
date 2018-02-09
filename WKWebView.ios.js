@@ -376,6 +376,9 @@ class WKWebView extends React.Component {
     return WKWebViewManager.evaluateJavaScript(this.getWebViewHandle(), js);
   };
 
+
+  getCookies = () => WKWebViewManager.getCookies(this.getWebViewHandle());
+
   /**
    * We return an event with a bunch of fields including:
    *  url, title, loading, canGoBack, canGoForward

@@ -16,8 +16,8 @@
 
 // runtime trick to remove WKWebView keyboard default toolbar
 // see: http://stackoverflow.com/questions/19033292/ios-7-uiwebview-keyboard-issue/19042279#19042279
-@interface _SwizzleHelper : NSObject @end
-@implementation _SwizzleHelper
+@interface _SwizzleHelperWK : NSObject @end
+@implementation _SwizzleHelperWK
 -(id)inputAccessoryView
 {
   return nil;
@@ -52,6 +52,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
 
 - (instancetype)initWithProcessPool:(WKProcessPool *)processPool
 {
+  NSLog(@"hi from init");
   if(self = [self initWithFrame:CGRectZero])
   {
     super.backgroundColor = [UIColor clearColor];
@@ -76,12 +77,20 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
 
 - (void)loadRequest:(NSURLRequest *)request
 {
+  NSLog(@"hi from load");
   if (request.URL && _sendCookies) {
+    NSLog(@"sending cookies");
+
     NSDictionary *cookies = [NSHTTPCookie requestHeaderFieldsWithCookies:[[NSHTTPCookieStorage sharedHTTPCookieStorage] cookiesForURL:request.URL]];
+    NSLog(@"%@", cookies);
     if ([cookies objectForKey:@"Cookie"]) {
+      NSLog(@"cookies exist");
+
       NSMutableURLRequest *mutableRequest = request.mutableCopy;
       [mutableRequest addValue:cookies[@"Cookie"] forHTTPHeaderField:@"Cookie"];
       request = mutableRequest;
+      NSLog(@"here's a request");
+      NSLog(@"%@", request);
     }
   }
   
@@ -102,7 +111,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
 
   if(subview == nil) return;
 
-  NSString* name = [NSString stringWithFormat:@"%@_SwizzleHelper", subview.class.superclass];
+  NSString* name = [NSString stringWithFormat:@"%@_SwizzleHelperWK", subview.class.superclass];
   Class newClass = NSClassFromString(name);
 
   if(newClass == nil)
@@ -110,7 +119,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
     newClass = objc_allocateClassPair(subview.class, [name cStringUsingEncoding:NSASCIIStringEncoding], 0);
     if(!newClass) return;
 
-    Method method = class_getInstanceMethod([_SwizzleHelper class], @selector(inputAccessoryView));
+    Method method = class_getInstanceMethod([_SwizzleHelperWK class], @selector(inputAccessoryView));
       class_addMethod(newClass, @selector(inputAccessoryView), method_getImplementation(method), method_getTypeEncoding(method));
 
     objc_registerClassPair(newClass);
@@ -138,9 +147,27 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
   [_webView evaluateJavaScript:javaScriptString completionHandler:completionHandler];
 }
 
+- (void)getCookies:(void (^)(NSArray<NSHTTPCookie *> *))completionHandler
+{
+  WKHTTPCookieStore *cookieStore = _webView.configuration.websiteDataStore.httpCookieStore;
+
+  [cookieStore getAllCookies:completionHandler];
+
+}
+
 - (void)goBack
 {
   [_webView goBack];
+}
+
+- (BOOL)canGoBack
+{
+  return [_webView canGoBack];
+}
+
+- (BOOL)canGoForward
+{
+  return [_webView canGoForward];
 }
 
 - (void)reload
@@ -324,12 +351,22 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
 - (void)webView:(WKWebView *)webView decidePolicyForNavigationResponse:(WKNavigationResponse *)navigationResponse decisionHandler:(void (^)(WKNavigationResponsePolicy))decisionHandler
 {
   NSArray *cookies = [NSHTTPCookie cookiesWithResponseHeaderFields:((NSHTTPURLResponse *)navigationResponse.response).allHeaderFields forURL:((NSHTTPURLResponse *)navigationResponse.response).URL];
-  
-  for (int i = 0; i < cookies.count; i++) {
-    NSHTTPCookie *cookie = [cookies objectAtIndex:i];
-    NSLog(@"cookie: name=%@, value=%@", cookie.name, cookie.value);
-    [[NSHTTPCookieStorage sharedHTTPCookieStorage] setCookie:cookie];
-  }
+
+
+  WKHTTPCookieStore *cookieStore = webView.configuration.websiteDataStore.httpCookieStore;
+  [cookieStore getAllCookies:^(NSArray<NSHTTPCookie *> *cookies) {
+    for (int i = 0; i < cookies.count; i++) {
+      
+      NSHTTPCookie *cookie = [cookies objectAtIndex:i];
+      NSLog(@"cookie: name=%@, value=%@, domain=%@", cookie.name, cookie.value, cookie.domain);
+      [[NSHTTPCookieStorage sharedHTTPCookieStorage] setCookie:cookie];
+    }
+  }];
+  NSLog(@"%@", ((NSHTTPURLResponse *)navigationResponse.response).allHeaderFields);
+  NSLog(@"%@", ((NSHTTPURLResponse *)navigationResponse.response).URL);
+  NSLog(@"HI from nav response");
+
+
   
   decisionHandler(WKNavigationResponsePolicyAllow);
 }
@@ -418,6 +455,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
 - (WKWebView *)webView:(WKWebView *)webView createWebViewWithConfiguration:(WKWebViewConfiguration *)configuration forNavigationAction:(WKNavigationAction *)navigationAction windowFeatures:(WKWindowFeatures *)windowFeatures
 {
   NSString *scheme = navigationAction.request.URL.scheme;
+  NSLog(@"hi friend");
   if ((navigationAction.targetFrame.isMainFrame || _openNewWindowInWebView) && ([scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"])) {
     [webView loadRequest:navigationAction.request];
   } else {
