@@ -148,7 +148,11 @@ RCT_EXPORT_METHOD(getCookies:(nonnull NSNumber *)reactTag
       RCTLogError(@"Invalid view returned from registry, expecting RCTWKWebView, got: %@", view);
     } else {
         [view getCookies:^(NSArray<NSHTTPCookie *> *result){
-          resolve(result);
+          NSMutableDictionary *cookies = [NSMutableDictionary dictionary];
+          for (NSHTTPCookie *c in result) {
+              [cookies setObject:c.value forKey:c.name];
+          }
+          resolve(cookies);
       }];
     }
   }];
