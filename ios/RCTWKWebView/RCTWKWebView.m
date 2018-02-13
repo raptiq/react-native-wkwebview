@@ -52,7 +52,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
 
 - (instancetype)initWithProcessPool:(WKProcessPool *)processPool
 {
-  NSLog(@"hi from init");
+  
   if(self = [self initWithFrame:CGRectZero])
   {
     super.backgroundColor = [UIColor clearColor];
@@ -77,19 +77,16 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
 
 - (void)loadRequest:(NSURLRequest *)request
 {
-  NSLog(@"hi from load");
   if (request.URL && _sendCookies) {
     NSLog(@"sending cookies");
 
     NSDictionary *cookies = [NSHTTPCookie requestHeaderFieldsWithCookies:[[NSHTTPCookieStorage sharedHTTPCookieStorage] cookiesForURL:request.URL]];
     NSLog(@"%@", cookies);
     if ([cookies objectForKey:@"Cookie"]) {
-      NSLog(@"cookies exist");
 
       NSMutableURLRequest *mutableRequest = request.mutableCopy;
       [mutableRequest addValue:cookies[@"Cookie"] forHTTPHeaderField:@"Cookie"];
       request = mutableRequest;
-      NSLog(@"here's a request");
       NSLog(@"%@", request);
     }
   }
@@ -356,15 +353,10 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
   WKHTTPCookieStore *cookieStore = webView.configuration.websiteDataStore.httpCookieStore;
   [cookieStore getAllCookies:^(NSArray<NSHTTPCookie *> *cookies) {
     for (int i = 0; i < cookies.count; i++) {
-      
       NSHTTPCookie *cookie = [cookies objectAtIndex:i];
-      NSLog(@"cookie: name=%@, value=%@, domain=%@", cookie.name, cookie.value, cookie.domain);
       [[NSHTTPCookieStorage sharedHTTPCookieStorage] setCookie:cookie];
     }
   }];
-  NSLog(@"%@", ((NSHTTPURLResponse *)navigationResponse.response).allHeaderFields);
-  NSLog(@"%@", ((NSHTTPURLResponse *)navigationResponse.response).URL);
-  NSLog(@"HI from nav response");
 
 
   
@@ -455,7 +447,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
 - (WKWebView *)webView:(WKWebView *)webView createWebViewWithConfiguration:(WKWebViewConfiguration *)configuration forNavigationAction:(WKNavigationAction *)navigationAction windowFeatures:(WKWindowFeatures *)windowFeatures
 {
   NSString *scheme = navigationAction.request.URL.scheme;
-  NSLog(@"hi friend");
+
   if ((navigationAction.targetFrame.isMainFrame || _openNewWindowInWebView) && ([scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"])) {
     [webView loadRequest:navigationAction.request];
   } else {
