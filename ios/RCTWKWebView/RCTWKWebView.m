@@ -77,20 +77,39 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
 - (void)loadRequest:(NSURLRequest *)request
 {
   if (request.URL && _sendCookies) {
-    NSLog(@"sending cookies");
+    NSArray *cookies = [[NSHTTPCookieStorage sharedHTTPCookieStorage] cookiesForURL:request.URL];
+    NSDictionary *cookiesWithHeaders = [NSHTTPCookie requestHeaderFieldsWithCookies:cookies];
+    NSLog(@"%@", cookiesWithHeaders);
 
-    NSDictionary *cookies = [NSHTTPCookie requestHeaderFieldsWithCookies:[[NSHTTPCookieStorage sharedHTTPCookieStorage] cookiesForURL:request.URL]];
-    NSLog(@"%@", cookies);
-    if ([cookies objectForKey:@"Cookie"]) {
-
+    if ([cookiesWithHeaders objectForKey:@"Cookie"]) {
       NSMutableURLRequest *mutableRequest = request.mutableCopy;
-      [mutableRequest addValue:cookies[@"Cookie"] forHTTPHeaderField:@"Cookie"];
+      [mutableRequest addValue:cookiesWithHeaders[@"Cookie"] forHTTPHeaderField:@"Cookie"];
       request = mutableRequest;
-      NSLog(@"%@", request);
     }
-  }
 
-  [_webView loadRequest:request];
+    [self copyNSHTTPCookiesToWKHTTPCookieStore:cookies completionHandler:^{
+      [_webView loadRequest:request];
+    }];
+  } else {
+    [_webView loadRequest:request];
+  }
+}
+
+- (void)copyNSHTTPCookiesToWKHTTPCookieStore:(NSArray<NSHTTPCookie *> *)cookies completionHandler:(nullable void (^)())completionHandler; {
+   WKHTTPCookieStore *cookieStore = _webView.configuration.websiteDataStore.httpCookieStore;
+   if (cookies.count == 0) {
+      !completionHandler ?: completionHandler();
+      return;
+   }
+
+   for (NSHTTPCookie *cookie in cookies) {
+       [cookieStore setCookie:cookie completionHandler:^{
+           if ([[cookies lastObject] isEqual:cookie]) {
+               !completionHandler ?: completionHandler();
+               return;
+           }
+       }];
+   }
 }
 
 -(void)setHideKeyboardAccessoryView:(BOOL)hideKeyboardAccessoryView
