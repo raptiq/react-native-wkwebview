@@ -29,11 +29,13 @@ import WKWebView from 'react-native-wkwebview-reborn';
 
 Try replacing your existing `WebView` with `WKWebView` and it should work in most cases.
 
-If your React Native < 0.40, please user **0.x.x** versions.
+If your React Native < 0.40, please use **0.x.x** versions.
 
 ### Compatibility with UIWebView
 
 WKWebView aims to be a drop-in replacement for UIWebView. However, some legacy UIWebView properties are not supported.
+
+**Since 1.14.0, WkWebView supports `onMessage` and `postMessage` as in the default WebView. You can refer to the React Native documentation or the `example` project. For advanced or customized usage, please refer to [Advacned Communication between React Native and WkWebView](#advacned-communication-between-react-native-and-wkwebview).**
 
 #### Additional props:
 
@@ -70,7 +72,46 @@ Set a custom user agent for WKWebView. Note this only works on iOS 9+. Previous 
 
 - **hideKeyboardAccessoryView**
 
-This will hide the keyboard accesory view (`<` `>` and `Done`). Default is false.
+This will hide the keyboard accessory view (`<` `>` and `Done`). Default is false.
+
+- **allowsLinkPreview**
+
+A Boolean value that determines whether pressing on a link displays a preview of the destination for the link. This props is available on devices that support 3D Touch. In iOS 10 and later, the default value is true; before that, the default value is false.
+
+#### Currently supported props are:
+
+- automaticallyAdjustContentInsets
+- contentInset
+- html (deprecated)
+- injectedJavaScript
+- onError
+- onLoad
+- onLoadEnd
+- onLoadStart
+- onNavigationStateChange
+- renderError
+- renderLoading
+- source
+- startInLoadingState
+- style
+- url (deprecated)
+- bounces
+- onShouldStartLoadWithRequest
+- pagingEnabled
+- scrollEnabled
+- directionalLockEnabled
+
+####  Unsupported props are:
+
+- mediaPlaybackRequiresUserAction
+- scalesPageToFit
+- domStorageEnabled
+- javaScriptEnabled
+- allowsInlineMediaPlayback
+- decelerationRate
+
+### Advacned Communication between React Native and WkWebView
+
 
 #### Communication from WKWebview to React Native
 
@@ -86,6 +127,12 @@ Then in your webview, you can post message to React Native using
 
 ```
 window.webkit.messageHandlers.reactNative.postMessage({data: 'hello!'});
+```
+
+or (since 1.14.0)
+
+```
+window..postMessage({data: 'hello!'});
 ```
 
 Then your React Native should have
@@ -120,38 +167,6 @@ Then you can send message from React Native with this method call:
 // <WKWebView ref={ref => { this.webview = ref; }} />
 this.webview.evaluateJavaScript('receivedMessageFromReactNative("Hello from the other side.")');
 ```
-
-#### Currently supported props are:
-
-- automaticallyAdjustContentInsets
-- contentInset
-- html (deprecated)
-- injectedJavaScript
-- onError
-- onLoad
-- onLoadEnd
-- onLoadStart
-- onNavigationStateChange
-- renderError
-- renderLoading
-- source
-- startInLoadingState
-- style
-- url (deprecated)
-- bounces
-- onShouldStartLoadWithRequest
-- pagingEnabled
-- scrollEnabled
-- directionalLockEnabled
-
-####  Unsupported props are:
-
-- mediaPlaybackRequiresUserAction
-- scalesPageToFit
-- domStorageEnabled
-- javaScriptEnabled
-- allowsInlineMediaPlayback
-- decelerationRate
 
 If you look at the source, the JavaScript side is mostly derived from React Native's WebView. The Objective C side mostly deals with the API difference between UIWebView and WKWebView.
 
